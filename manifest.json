@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Clean Copy",
+  "version": "1.1.0",
+  "description": "Copy any text as clean, formatted Markdown. No more messy pastes — just right-click and copy.",
+  "permissions": [
+    "activeTab",
+    "clipboardWrite",
+    "contextMenus",
+    "scripting",
+    "storage",
+    "offscreen"
+  ],
+  "action": {
+    "default_title": "Clean Copy",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "copy-as-markdown": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+C",
+        "mac": "Command+Shift+C"
+      },
+      "description": "Copy selected text as clean Markdown"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

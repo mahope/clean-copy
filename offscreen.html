@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<script>
+  // Signal readiness so the service worker knows it's safe to send copy payloads.
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'ping-offscreen') {
+      sendResponse({ type: 'offscreen-ready' });
+      return;
+    }
+    if (request.type === 'copy') {
+      const done = () => sendResponse({ success: true });
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(request.text).then(done).catch(() => {
+          fallbackCopy(request.text);
+          done();
+        });
+      } else {
+        fallbackCopy(request.text);
+        done();
+      }
+      return true;
+    }
+  });
+
+  function fallbackCopy(text) {
+    const input = document.createElement('textarea');
+    input.value = text;
+    input.style.position = 'fixed';
+    input.style.opacity = '0';
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand('copy');
+    document.body.removeChild(input);
+  }
+
+  chrome.runtime.sendMessage({ type: 'offscreen-ready' }).catch(() => {});
+</script>
+</body>
+</html>
