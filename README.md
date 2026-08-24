@@ -2,7 +2,7 @@
 
 Copy any selected text as **clean, formatted Markdown** — right from your browser's right-click menu. No more messy pastes with broken styling, inline CSS junk, or lost formatting.
 
-![Version](https://img.shields.io/badge/version-1.3.0-blue) ![Chrome](https://img.shields.io/badge/Chrome%20%7C%20Firefox-MV3-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Version](https://img.shields.io/badge/version-1.4.1-blue) ![Chrome](https://img.shields.io/badge/Chrome%20%7C%20Firefox-MV3-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ## What it does
 
@@ -19,7 +19,7 @@ The popup also lets you paste-and-clean: drop in dirty HTML or messy text and ge
 
 ## Install (from source, ~30 seconds)
 
-No build step. No dependencies. Plain JavaScript. Also available for **Firefox** ([repo](https://github.com/mahope/clean-copy-firefox)) and as a [CLI](https://github.com/mahope/clean-copy-cli) (`brew install clean-copy` or `npx github:mahope/clean-copy-cli`).
+No build step. No dependencies. Plain JavaScript. Also available for **Firefox** ([repo](https://github.com/mahope/clean-copy-firefox)), as an [Obsidian plugin](https://github.com/mahope/clean-copy-obsidian), and as a [CLI](https://github.com/mahope/clean-copy-cli) (`brew install clean-copy` or `npx github:mahope/clean-copy-cli`).
 
 1. Download or clone this repository:
    ```bash
