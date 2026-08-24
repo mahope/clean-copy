@@ -2,7 +2,7 @@
 
 Copy any selected text as **clean, formatted Markdown** — right from your browser's right-click menu. No more messy pastes with broken styling, inline CSS junk, or lost formatting.
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue) ![Chrome](https://img.shields.io/badge/Chrome-MV3-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Version](https://img.shields.io/badge/version-1.2.0-blue) ![Chrome](https://img.shields.io/badge/Chrome-MV3-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ## What it does
 

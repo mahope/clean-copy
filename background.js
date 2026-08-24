@@ -3,6 +3,7 @@
  * Context menu, keyboard shortcut, HTML→Markdown conversion,
  * clipboard via offscreen document, toast injected on demand.
  * Permissions: activeTab only — no host_permissions, no static content scripts.
+ * Pro: custom cleanup rules from chrome.storage are applied after every copy.
  */
 
 const CLEAN_RULES = [
@@ -98,6 +99,48 @@ function htmlToMarkdown(html) {
 
   return cleanText(md);
 }
+
+/* ── Pro: custom cleanup rules ────────────────────────────────────
+ * Rules live in chrome.storage.local ({customRules:[...]}), edited on
+ * the options page. They are compiled once per storage version and
+ * applied to the final output after normal cleaning. A rule that
+ * fails to compile is skipped silently — copying must never break. */
+
+let proState = { active: false, compiled: [], version: 0 };
+
+function compileRules(rules) {
+  if (!Array.isArray(rules)) return [];
+  return rules.map((r) => {
+    try {
+      const flags = r.caseSensitive === false ? 'gi' : 'g';
+      const re = r.regex ? new RegExp(r.find, flags)
+        : new RegExp(r.find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+      return { re, replace: String(r.replace == null ? '' : r.replace) };
+    } catch (e) {
+      return null; // skip broken rules — copy keeps working
+    }
+  }).filter(Boolean);
+}
+
+function applyCompiled(text) {
+  let out = text;
+  for (const c of proState.compiled) out = out.replace(c.re, c.replace);
+  return cleanText(out);
+}
+
+chrome.storage.local.get(['proLicense', 'customRules'], (d) => {
+  proState.active = !!d.proLicense;
+  proState.compiled = proState.active ? compileRules(d.customRules) : [];
+});
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.customRules || changes.proLicense) {
+    chrome.storage.local.get(['proLicense', 'customRules'], (d) => {
+      proState.active = !!d.proLicense;
+      proState.compiled = proState.active ? compileRules(d.customRules) : [];
+    });
+  }
+});
+
 /** Extract selection text/html from a tab via scripting API */
 async function processSelection(tabId, mode) {
   try {
@@ -135,6 +178,12 @@ async function processSelection(tabId, mode) {
   } catch (err) {
     return { error: `Could not process: ${err.message}` };
   }
+}
+
+/** Apply Pro custom rules to a finished conversion result. */
+function withProRules(result) {
+  if (!result || result.error || !proState.active || !result.content) return result;
+  return { ...result, content: applyCompiled(result.content), proApplied: true };
 }
 
 /**
@@ -205,7 +254,7 @@ async function showToast(tabId, message, isError = false) {
 }
 
 async function doCopy(tabId, mode) {
-  const result = await processSelection(tabId, mode);
+  const result = withProRules(await processSelection(tabId, mode));
   if (result.error) {
     await showToast(tabId, result.error, true);
     return false;
@@ -249,7 +298,7 @@ chrome.commands.onCommand.addListener(async (command) => {
   }
 });
 
-// Messages from popup
+// Messages from popup + options page (batch conversion)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'process-selection') {
     chrome.tabs.query({ active: true, currentWindow: true }).then(async (tabs) => {
@@ -257,9 +306,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ error: 'No active tab.' });
         return;
       }
-      const result = await processSelection(tabs[0].id, request.mode || 'plain');
+      const result = withProRules(await processSelection(tabs[0].id, request.mode || 'plain'));
       sendResponse(result);
     });
     return true;
+  }
+  if (request.type === 'get-pro-state') {
+    sendResponse({ active: proState.active });
+    return false;
   }
 });

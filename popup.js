@@ -60,15 +60,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingsBtn = document.getElementById('settings-btn');
   if (settingsBtn) {
     settingsBtn.addEventListener('click', () => {
-      // No options page in v1.1 — the mode toggle above IS the setting.
-      statusDiv.textContent = 'Tip: use the toggles above to pick your format.';
-      statusDiv.className = 'status';
+      chrome.runtime.openOptionsPage();
     });
   }
 
+  // Pro state drives the footer link label; click opens the options page.
+  chrome.runtime.sendMessage({ type: 'get-pro-state' }, (state) => {
+    const active = !!(state && state.active);
+    proLink.innerHTML = active
+      ? '✓ Pro active <span class="pro-badge">PRO</span>'
+      : 'Pro $19/yr <span class="pro-badge">Soon</span>';
+  });
+
   proLink.addEventListener('click', (e) => {
     e.preventDefault();
-    statusDiv.textContent = '🔒 Pro coming when Lemon Squeezy launches!';
-    statusDiv.className = 'status';
+    chrome.runtime.openOptionsPage();
   });
 });

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Clean Copy",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Copy any text as clean, formatted Markdown. No more messy pastes \u2014 just right-click and copy.",
   "permissions": [
     "activeTab",
@@ -31,5 +31,9 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   }
 }
