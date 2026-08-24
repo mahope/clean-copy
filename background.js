@@ -12,7 +12,9 @@ const CLEAN_RULES = [
   { pattern: /\u2013/g, replacement: ' - ' },
   { pattern: /[\u200B\u200C\u200D\uFEFF]/g, replacement: '' },
   { pattern: /\u00A0/g, replacement: ' ' },
-  { pattern: /[ ]{2,}/g, replacement: ' ' },
+  // Collapse runs of spaces but never touch whitespace at line starts,
+  // so Markdown list indentation survives.
+  { pattern: /([^\n \t])[ \t]{2,}/g, replacement: '$1 ' },
   { pattern: /\n{3,}/g, replacement: '\n\n' },
 ];
 
@@ -22,10 +24,6 @@ function cleanText(text) {
     cleaned = cleaned.replace(rule.pattern, rule.replacement);
   }
   return cleaned.trim();
-}
-
-function escapeHtmlAttr(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function htmlToMarkdown(html) {
@@ -52,10 +50,36 @@ function htmlToMarkdown(html) {
   });
 
   md = md.replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
-  md = md.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_, item) => {
-    // Nested lists: keep inner content, strip any tags the recursive passes missed.
-    return '\n- ' + item.replace(/<li/gi, '\n<li');
-  });
+
+  // Lists: convert innermost lists repeatedly until none remain,
+  // so arbitrarily deep nesting produces one "- " per item.
+  const convertList = (_, openTag, body) => {
+    const ordered = /^<ol/i.test(openTag);
+    let idx = 0;
+    const items = [];
+    const re = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+    let m;
+    while ((m = re.exec(body)) !== null) {
+      idx += 1;
+      const marker = ordered ? `${idx}. ` : '- ';
+      // Re-indent sub-list lines that are already converted, then trim
+      // the item's own leading/trailing whitespace. Sub-list markers get
+      // two-space indentation relative to the parent item.
+      const inner = m[1].replace(/^\s+/, '').replace(/\s+$/, '')
+        // Sub-list lines: keep any existing indentation and add two
+        // spaces per level so nesting depth survives conversion.
+        .replace(/\n([ \t]*)- /g, (all, ws) => '\n  ' + ws + '- ')
+        .replace(/\n([ \t]*)(\d+)\. /g, (all, ws, n) => '\n  ' + ws + n + '. ');
+      items.push(marker + inner);
+    }
+    return '\n' + items.join('\n') + '\n';
+  };
+  let prev;
+  do {
+    prev = md;
+    md = md.replace(/(<(?:ul|ol)[^>]*>)((?:(?!<\/?(?:ul|ol)[^>]*>)[\s\S])*)<\/(?:ul|ol)>/gi, convertList);
+  } while (md !== prev);
+
   md = md.replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n');
   md = md.replace(/<br\s*\/?>/gi, '\n');
   md = md.replace(/<hr\s*\/?>/gi, '---\n\n');
@@ -63,16 +87,17 @@ function htmlToMarkdown(html) {
   md = md.replace(/<[^>]*>/g, '');
   md = md.replace(/&amp;/g, '&');
   md = md.replace(/&lt;/g, '<');
-  md = md.replace(/>/g, '>');
+  md = md.replace(/&gt;/g, '>');
   md = md.replace(/&quot;/g, '"');
   md = md.replace(/&#39;/g, "'");
 
   md = md.replace(/\n{4,}/g, '\n\n');
-  md = md.replace(/[ ]{2,}/g, ' ');
+  // Collapse runs of spaces, but preserve indentation at line starts
+  // (nested Markdown lists need it).
+  md = md.replace(/([^\n \t])[ ]{2,}/g, '$1 ');
 
   return cleanText(md);
 }
-
 /** Extract selection text/html from a tab via scripting API */
 async function processSelection(tabId, mode) {
   try {
