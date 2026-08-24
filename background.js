@@ -546,6 +546,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true;
   }
+  if (request.type === 'process-pasted') {
+    const raw = typeof request.text === 'string' ? request.text : '';
+    if (!raw.trim()) {
+      sendResponse({ error: 'Nothing to clean — paste some text first.' });
+      return false;
+    }
+    let content;
+    try {
+      // Pasted input can be HTML or plain text. Treat it as HTML when it
+      // contains tags; entity decoding + cleanText run in both paths.
+      const looksHtml = /<\/?[a-z][^>]*>/i.test(raw);
+      content = request.mode === 'markdown'
+        ? htmlToMarkdown(raw)
+        : looksHtml ? htmlToMarkdown(raw) : cleanText(stripTagsSafe(raw));
+    } catch (err) {
+      sendResponse({ error: `Could not process: ${err.message}` });
+      return false;
+    }
+    sendResponse(withProRules({ content }));
+    return false;
+  }
+
   if (request.type === 'get-pro-state') {
     sendResponse({ active: proState.active });
     return false;

@@ -57,6 +57,47 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // --- Paste-and-clean -------------------------------------------------
+  const toggleBtn = document.getElementById('paste-toggle');
+  const pasteSection = document.getElementById('paste-section');
+  const pasteInput = document.getElementById('paste-input');
+  const pasteCleanBtn = document.getElementById('paste-clean-btn');
+
+  if (toggleBtn && pasteSection) {
+    toggleBtn.addEventListener('click', () => {
+      const open = pasteSection.hidden;
+      pasteSection.hidden = !open;
+      toggleBtn.setAttribute('aria-expanded', String(open));
+      toggleBtn.textContent = open ? '▸ Paste text to clean' : '▾ Paste text to clean';
+      if (open) pasteInput.focus();
+    });
+
+    const cleanPasted = (mode) => {
+      const raw = pasteInput.value;
+      statusDiv.textContent = '⏳ Processing...';
+      statusDiv.className = 'status';
+      chrome.runtime.sendMessage({ type: 'process-pasted', text: raw, mode }, (response) => {
+        if (chrome.runtime.lastError || !response || response.error) {
+          statusDiv.textContent = '⚠ ' + ((response && response.error) || 'Error processing pasted text');
+          statusDiv.className = 'status error';
+          return;
+        }
+        // Put the result back in the box so it can be copied manually too.
+        pasteInput.value = response.content;
+        navigator.clipboard.writeText(response.content).then(() => {
+          statusDiv.textContent = `✅ Cleaned & copied (${response.content.length} chars)`;
+          statusDiv.className = 'status success';
+        }).catch(() => {
+          statusDiv.textContent = `✅ Cleaned (${response.content.length} chars) — copy from the box`;
+          statusDiv.className = 'status success';
+        });
+        setTimeout(() => { statusDiv.textContent = ''; statusDiv.className = 'status'; }, 3000);
+      });
+    };
+
+    pasteCleanBtn.addEventListener('click', () => cleanPasted(selectedMode));
+  }
+
   const settingsBtn = document.getElementById('settings-btn');
   if (settingsBtn) {
     settingsBtn.addEventListener('click', () => {

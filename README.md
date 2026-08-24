@@ -2,7 +2,7 @@
 
 Copy any selected text as **clean, formatted Markdown** — right from your browser's right-click menu. No more messy pastes with broken styling, inline CSS junk, or lost formatting.
 
-![Version](https://img.shields.io/badge/version-1.4.1-blue) ![Chrome](https://img.shields.io/badge/Chrome%20%7C%20Firefox-MV3-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Version](https://img.shields.io/badge/version-1.5.0-blue) ![Chrome](https://img.shields.io/badge/Chrome%20%7C%20Firefox-MV3-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ## What it does
 
@@ -58,6 +58,8 @@ MIT
 
 ## Changelog
 
+- **1.5.0** — Paste-and-clean now actually in the popup: paste dirty HTML or messy text, get clean Markdown/plain text back, copied to your clipboard. (Was documented since 1.2.0 but missing from the UI.)
+- **1.4.1** — Table column alignment preserved in Markdown output; animated demo GIF.
 - **1.3.0** — Full entity decoder (named + numeric HTML entities), table conversion hardening, shared core with Firefox/CLI/Obsidian builds. Download: [v1.3.0 release](https://github.com/mahope/clean-copy/releases/tag/v1.3.0) or the [site](https://hermes-passiv.pages.dev/downloads).
 - **1.2.2** — Tables → Markdown tables, entity decoding for common cases.
 - **1.2.0** — Paste-and-clean popup, options page.
