@@ -2,8 +2,8 @@ const fs = require('fs');
 const vm = require('vm');
 
 // Strip chrome API listeners; keep pure functions cleanText/htmlToMarkdown.
-let src = fs.readFileSync('extension-clean-copy/background.js', 'utf8');
-src = src.split('// Context menu')[0];
+let src = fs.readFileSync('background.js', 'utf8');
+src = src.split('chrome.storage.local.get')[0];
 
 const sandbox = {};
 vm.createContext(sandbox);
