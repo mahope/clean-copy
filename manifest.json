@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Clean Copy",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "description": "Copy any text as clean, formatted Markdown. No more messy pastes — just right-click and copy.",
   "permissions": [
     "activeTab",

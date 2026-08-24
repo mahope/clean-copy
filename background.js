@@ -147,10 +147,27 @@ function htmlToMarkdown(html) {
 
   md = md.replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
 
-  // Tables: convert before <p>/<br> rules mangle cell structure.
-  // Handles optional caption, thead/tbody and colspan by repeating the
-  // header row so every body row has the right number of pipes.
-  md = md.replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (_, tableHtml) => {
+  // Abbreviations: <abbr title="..."> becomes "Term (Title)" at the FIRST
+  // occurrence in the output; later occurrences keep just the term so the
+  // parenthetical isn't repeated on every use.
+  const abbrSeen = new Set();
+  md = md.replace(/<abbr[^>]*title="([^"]*)"[^>]*>([\s\S]*?)<\/abbr>|<abbr[^>]*>([\s\S]*?)<\/abbr>/gi,
+    (m, title, term1, term2) => {
+      const term = (term1 || '').trim() || (term2 || '').trim();
+      if (!term) return '';
+      const t = (title || '').trim();
+      if (t && !abbrSeen.has(term.toLowerCase() + '|' + t)) {
+        abbrSeen.add(term.toLowerCase() + '|' + t);
+        return term + ' (' + t + ')';
+      }
+      return term;
+    });
+
+  // Tables: converted innermost-FIRST (like lists/blockquotes) so tables
+  // nested inside cells survive instead of being torn apart by a lazy
+  // outer match that stops at the inner </table>.
+  let tblPrev;
+  const convertTable = (_, tableHtml) => {
     const cellText = (cellHtml) => {
       let t = htmlToMarkdown(cellHtml);
       return t.replace(/\s*\n+\s*/g, ' ').replace(/\|/g, '\\|').trim();
@@ -178,7 +195,11 @@ function htmlToMarkdown(html) {
       out.push('| ' + rows[i].join(' | ') + ' |');
     }
     return '\n' + out.join('\n') + '\n\n';
-  });
+  };
+  do {
+    tblPrev = md;
+    md = md.replace(/<table[^>]*>((?:(?!<table[\s>]|<\/table)[\s\S])*)<\/table>/gi, convertTable);
+  } while (md !== tblPrev);
 
 // Lists: convert innermost lists repeatedly until none remain,
   // so arbitrarily deep nesting produces one "- " per item.
