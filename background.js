@@ -37,6 +37,63 @@ function htmlToMarkdown(html) {
   // CDATA sections: keep the raw content instead of dropping everything.
   md = md.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
 
+  // Strip SVG and MathML subtrees entirely — their internal markup/text
+  // would otherwise leak into the output as noise. <math alt> is kept.
+  md = md.replace(/<(svg|math)\b[^>]*>[\s\S]*?<\/\1>/gi,
+    (m, tag) => {
+      if (tag.toLowerCase() === 'math') {
+        const alt = /alt="([^"]*)"/i.exec(m);
+        if (alt && alt[1]) return '\n' + alt[1].trim() + '\n';
+      }
+      return '';
+    });
+
+  // Form controls that render as widgets, not text: keep only meaningful
+  // text, each on its own line so options don't glue together.
+  md = md.replace(/<select\b[^>]*>([\s\S]*?)<\/select>/gi, (_, body) => {
+    const opts = [];
+    const re = /<(?:option|optgroup)\b[^>]*>/gi;
+    let m;
+    while ((m = re.exec(body)) !== null) {
+      const labelM = /label="([^"]*)"/i.exec(m[0]);
+      // optgroup uses its label; option uses its text content
+      if (labelM) { opts.push(labelM[1].trim()); continue; }
+      const rest = body.slice(re.lastIndex);
+      const text = /^([^<]*)/.exec(rest)[1];
+      if (text.trim()) opts.push(text.trim());
+    }
+    return opts.length ? '\n' + opts.join('\n') + '\n' : '';
+  });
+  md = md.replace(/<(input|textarea)\b[^>]*>/gi, (m, tag) => {
+    if (tag.toLowerCase() === 'textarea') {
+      // textarea content is its value; handled below via paired match
+      return m;
+    }
+    const val = /value="([^"]*)"/i.exec(m);
+    return val && val[1] ? '\n' + val[1] + '\n' : '';
+  });
+
+  // iframe/object fallback content is kept as a separate block — without
+  // this the fallback text glues onto whatever block follows the tag.
+  md = md.replace(/<(iframe|object)\b[^>]*>([\s\S]*?)<\/\1>/gi,
+    (_, tag, body) => {
+      if (tag.toLowerCase() === 'object') {
+        // drop nested <param> tags, keep visible fallback text as a block
+        return '\n' + body.replace(/<param\b[^>]*>/gi, '') + '\n';
+      }
+      return '\n' + body + '\n';
+    });
+
+  // <details>/<summary>: keep the content, summary becomes a bold line so
+  // collapsible sections don't lose their heading.
+  md = md.replace(/<details[^>]*>([\s\S]*?)<\/details>/gi, (_, body) => {
+    let out = '';
+    const sum = body.match(/<summary[^>]*>([\s\S]*?)<\/summary>/i);
+    if (sum) out += '**' + htmlToMarkdown(sum[1]).trim() + '**\n\n';
+    out += htmlToMarkdown(body.replace(/<summary[^>]*>[\s\S]*?<\/summary>/i, ''));
+    return '\n' + out + '\n\n';
+  });
+
   // Definition lists: <dt> becomes a bold term line, <dd> an indented line.
   md = md.replace(/<dl[^>]*>([\s\S]*?)<\/dl>/gi, (_, body) => {
     const parts = [];
@@ -127,7 +184,10 @@ function htmlToMarkdown(html) {
   // so arbitrarily deep nesting produces one "- " per item.
   const convertList = (_, openTag, body) => {
     const ordered = /^<ol/i.test(openTag);
+    // <ol start="3"> continues numbering from the given value.
     let idx = 0;
+    const startAttr = /start\s*=\s*["']?(\d+)["']?/i.exec(openTag);
+    if (ordered && startAttr) idx = Math.max(0, parseInt(startAttr[1], 10) - 1);
     const items = [];
     const re = /<li[^>]*>([\s\S]*?)<\/li>/gi;
     let m;
@@ -175,7 +235,9 @@ function htmlToMarkdown(html) {
     }
     return Object.prototype.hasOwnProperty.call(ENTITIES, body) ? ENTITIES[body] : ent;
   });
-  md = md.replace(/&amp;/g, '&');  // last: don't let decoded entities re-expand
+  // Last pass: don't let decoded entities re-expand (parity with the
+  // extension's background.js, which has always done this).
+  md = md.replace(/&amp;/g, '&');
 
   md = md.replace(/\n{4,}/g, '\n\n');
   // Collapse runs of spaces, but preserve indentation at line starts
