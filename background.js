@@ -52,7 +52,40 @@ function htmlToMarkdown(html) {
 
   md = md.replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
 
-  // Lists: convert innermost lists repeatedly until none remain,
+  // Tables: convert before <p>/<br> rules mangle cell structure.
+  // Handles optional caption, thead/tbody and colspan by repeating the
+  // header row so every body row has the right number of pipes.
+  md = md.replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (_, tableHtml) => {
+    const cellText = (cellHtml) => {
+      let t = htmlToMarkdown(cellHtml);
+      return t.replace(/\s*\n+\s*/g, ' ').replace(/\|/g, '\\|').trim();
+    };
+    const rows = [];
+    const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    let trm;
+    while ((trm = trRe.exec(tableHtml)) !== null) {
+      const cells = [];
+      const cellRe = /<(th|td)[^>]*(?:colspan\s*=\s*[\x22\x27]?(\d+)[\x22\x27]?)?[^>]*>([\s\S]*?)<\/\1>/gi;
+      let cm;
+      while ((cm = cellRe.exec(trm[1])) !== null) {
+        cells.push(cellText(cm[3]));
+        const span = Math.max(1, parseInt(cm[2] || '1', 10) || 1);
+        for (let s = 1; s < span; s++) cells.push('');
+      }
+      rows.push(cells);
+    }
+    if (rows.length === 0) return '';
+    const cols = Math.max(...rows.map(r => r.length));
+    rows.forEach(r => { while (r.length < cols) r.push(''); });
+    const out = ['| ' + rows[0].join(' | ') + ' |',
+                 '|' + Array(cols).fill(' --- ').join('|') + '|'];
+    for (let i = 1; i < rows.length; i++) {
+      out.push('| ' + rows[i].join(' | ') + ' |');
+    }
+    return '\n' + out.join('\n') + '\n\n';
+  });
+
+// Lists: convert innermost lists repeatedly until none remain,
   // so arbitrarily deep nesting produces one "- " per item.
   const convertList = (_, openTag, body) => {
     const ordered = /^<ol/i.test(openTag);
@@ -86,11 +119,19 @@ function htmlToMarkdown(html) {
   md = md.replace(/<hr\s*\/?>/gi, '---\n\n');
 
   md = md.replace(/<[^>]*>/g, '');
-  md = md.replace(/&amp;/g, '&');
-  md = md.replace(/&lt;/g, '<');
-  md = md.replace(/&gt;/g, '>');
-  md = md.replace(/&quot;/g, '"');
-  md = md.replace(/&#39;/g, "'");
+  var ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00A0',
+    copy: '\u00A9', reg: '\u00AE', trade: '\u2122', hellip: '\u2026', mdash: '\u2014', ndash: '\u2013',
+    lsquo: '\u2018', rsquo: '\u2019', ldquo: '\u201C', rdquo: '\u201D',
+    eacute: '\u00E9', egrave: '\u00E8', agrave: '\u00E0', ccedil: '\u00E7', uuml: '\u00FC', ouml: '\u00F6', auml: '\u00E4',
+    aring: '\u00E5', oslash: '\u00F8', aelig: '\u00E6', ntilde: '\u00F1', iuml: 'ï', szlig: '\u00DF', euro: '\u20AC', deg: '\u00B0' };
+  md = md.replace(/&(#[0-9]+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, function (ent, body) {
+    if (body[0] === '#') {
+      var code = body[1] === 'x' || body[1] === 'X' ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+      return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : ent;
+    }
+    return Object.prototype.hasOwnProperty.call(ENTITIES, body) ? ENTITIES[body] : ent;
+  });
+  md = md.replace(/&amp;/g, '&');  // last: don't let decoded entities re-expand
 
   md = md.replace(/\n{4,}/g, '\n\n');
   // Collapse runs of spaces, but preserve indentation at line starts
