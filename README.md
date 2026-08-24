@@ -19,7 +19,7 @@ The popup also lets you paste-and-clean: drop in dirty HTML or messy text and ge
 
 ## Install (from source, ~30 seconds)
 
-No build step. No dependencies. Plain JavaScript. Also available for **Firefox** ([repo](https://github.com/mahope/clean-copy-firefox)) and as a [CLI](https://github.com/mahope/clean-copy-cli) (`npm i -g @mahope/clean-copy`).
+No build step. No dependencies. Plain JavaScript. Also available for **Firefox** ([repo](https://github.com/mahope/clean-copy-firefox)) and as a [CLI](https://github.com/mahope/clean-copy-cli) (`brew install clean-copy` or `npx github:mahope/clean-copy-cli`).
 
 1. Download or clone this repository:
    ```bash
