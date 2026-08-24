@@ -19,6 +19,39 @@ const CLEAN_RULES = [
   { pattern: /\n{3,}/g, replacement: '\n\n' },
 ];
 
+/**
+ * Strip remaining tags while tolerating ">" inside attribute values.
+ * A naive /<[^>]*>/ stops at the first ">" even when it sits inside a
+ * quoted attribute (Wikipedia's data-mw JSON, inline handlers), which
+ * leaks raw markup/JSON into the output and eats real text after it.
+ */
+function stripTagsSafe(html) {
+  let out = '';
+  let i = 0;
+  const n = html.length;
+  while (i < n) {
+    const lt = html.indexOf('<', i);
+    if (lt === -1) { out += html.slice(i); break; }
+    out += html.slice(i, lt);
+    // Find the real end of this tag: scan forward, respecting quotes.
+    let j = lt + 1, quote = null;
+    while (j < n) {
+      const ch = html[j];
+      if (quote) {
+        if (ch === quote) quote = null;
+      } else if (ch === '"' || ch === "'") {
+        quote = ch;
+      } else if (ch === '>') {
+        break;
+      }
+      j++;
+    }
+    if (j >= n) { out += html.slice(lt); break; } // unterminated tag: keep text
+    i = j + 1;
+  }
+  return out;
+}
+
 function cleanText(text) {
   let cleaned = text;
   for (const rule of CLEAN_RULES) {
@@ -138,10 +171,14 @@ function htmlToMarkdown(html) {
   md = md.replace(/<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*>/gi, '![$2]($1)');
   md = md.replace(/<img[^>]*src="([^"]*)"[^>]*>/gi, '![]($1)');
 
-  md = md.replace(/<pre[^>]*>(.*?)<\/pre>/gis, (_, code) => {
+  md = md.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gis, (_, code) => {
     code = code.replace(/<code[^>]*>/gi, '').replace(/<\/code>/gi, '');
     code = code.replace(/<br\s*\/?>/gi, '\n');
-    code = code.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/>/g, '>');
+    // NOTE: do NOT decode HTML entities here. Decoding &lt; to "<" before
+    // stripTagsSafe() runs makes entity text look like a real unterminated
+    // tag ("<b&gt;" -> strip eats everything to the next ">"), which wiped
+    // out fenced-code content on real pages (MDN docs). The final decode
+    // below (after stripping) handles entities correctly.
     return '```\n' + code.trim() + '\n```\n\n';
   });
 
@@ -243,7 +280,10 @@ function htmlToMarkdown(html) {
   md = md.replace(/<br\s*\/?>/gi, '\n');
   md = md.replace(/<hr\s*\/?>/gi, '---\n\n');
 
-  md = md.replace(/<[^>]*>/g, '');
+  // Strip remaining tags. Tolerate ">" inside attribute values (e.g. the
+  // JSON in Wikipedia's data-mw attributes): a naive <[^>]*> would stop at
+  // the inner ">", leak raw markup/JSON into the output and eat real text.
+  md = stripTagsSafe(md);
   var ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00A0',
     copy: '\u00A9', reg: '\u00AE', trade: '\u2122', hellip: '\u2026', mdash: '\u2014', ndash: '\u2013',
     lsquo: '\u2018', rsquo: '\u2019', ldquo: '\u201C', rdquo: '\u201D',
