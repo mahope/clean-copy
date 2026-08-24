@@ -12,6 +12,9 @@ const CLEAN_RULES = [
   { pattern: /\u2014/g, replacement: ' -- ' },
   { pattern: /\u2013/g, replacement: ' - ' },
   { pattern: /[\u200B\u200C\u200D\uFEFF]/g, replacement: '' },
+  // U+2060 word joiner and U+2062 invisible times: Guardian articles embed
+  // these mid-word; they leak into copied output as invisible garbage.
+  { pattern: /[\u2060-\u2064]/g, replacement: '' },
   { pattern: /\u00A0/g, replacement: ' ' },
   // Collapse runs of spaces but never touch whitespace at line starts,
   // so Markdown list indentation survives.

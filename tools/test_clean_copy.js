@@ -58,6 +58,7 @@ t('entity decode', htmlToMarkdown('<p>A &amp; B &lt; C &gt; D &quot;E&quot; F&#3
 t('nested list', htmlToMarkdown('<ul><li>a<ul><li>b</li></ul></li></ul>').trim(), '- a\n  - b');
 t('nested list 3', htmlToMarkdown('<ul><li>a<ul><li>b<ul><li>c</li></ul></li></ul></li></ul>').trim(), '- a\n  - b\n    - c');
 t('ordered list', htmlToMarkdown('<ol><li>one</li><li>two</li></ol>').trim(), '1. one\n2. two');
+t('invisible word joiners stripped', cleanText('Guard\u2060ian artic\u2062le'), 'Guardian article');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
