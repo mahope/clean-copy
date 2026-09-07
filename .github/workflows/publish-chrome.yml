@@ -1,0 +1,64 @@
+name: Publish to Chrome Web Store
+
+# Tag vX.Y.Z (matching manifest.json "version") -> zip the extension,
+# upload it to the Chrome Web Store and publish it.
+# Requires the four CWS_* secrets described in README.md ("Publishing").
+# The very first upload must be done manually in the developer dashboard;
+# this workflow only updates an existing listing.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run extension logic tests
+        run: node tools/test_clean_copy.js
+
+      - name: Version sanity check (manifest == tag)
+        run: |
+          VER="$(node -p "require('./manifest.json').version")"
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "${GITHUB_REF_NAME}" != "v${VER}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match manifest.json version ${VER} (expected v${VER})"
+            exit 1
+          fi
+          echo "VERSION=${VER}" >> "$GITHUB_ENV"
+
+      - name: Build zip (manifest.json at zip root)
+        run: |
+          ZIP="clean-copy-${VERSION}.zip"
+          zip -r "$ZIP" . \
+            -x '.git/*' '.github/*' 'clean-copy-repo/*' 'tools/*' \
+               '*.gif' 'README.md' '*.zip'
+          unzip -l "$ZIP"
+          unzip -p "$ZIP" manifest.json | node -e "
+            let s=''; process.stdin.on('data',d=>s+=d).on('end',()=>{
+              const m=JSON.parse(s);
+              if (m.version !== process.env.VERSION) throw new Error('zip manifest version mismatch');
+              console.log('zip ok:', m.name, m.version);
+            })"
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+
+      - name: Upload and publish
+        env:
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          for v in EXTENSION_ID CLIENT_ID CLIENT_SECRET REFRESH_TOKEN; do
+            [ -n "${!v}" ] || { echo "::error::secret CWS_${v} is not set (see README.md, Publishing)"; exit 1; }
+          done
+          npx --yes chrome-webstore-upload-cli@4 upload --source "$ZIP" --auto-publish

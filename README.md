@@ -48,6 +48,33 @@ node tools/test_clean_copy.js
 
 Tests cover text cleaning, HTML→Markdown conversion (headings, nested lists, code blocks, entities) and edge cases.
 
+## Publishing (maintainers)
+
+Releases are published to the Chrome Web Store automatically by
+[`.github/workflows/publish-chrome.yml`](.github/workflows/publish-chrome.yml)
+when a `vX.Y.Z` tag is pushed. The tag must equal the `version` in `manifest.json`.
+
+```bash
+# bump "version" in manifest.json, commit, then:
+git tag v1.5.3 && git push origin main v1.5.3
+```
+
+**The first upload must be done manually** in the
+[Chrome Web Store developer dashboard](https://chrome.google.com/webstore/devconsole)
+(one-time $5 registration fee). The API can only update an existing listing.
+
+One-time setup of the four repository secrets (Settings -> Secrets and variables -> Actions):
+
+| Secret | Where it comes from |
+|---|---|
+| `CWS_EXTENSION_ID` | The 32-character ID shown in the dashboard after the first manual upload |
+| `CWS_CLIENT_ID` | Google Cloud Console -> APIs & Services -> Credentials -> OAuth client ID (type: Desktop app). Enable the "Chrome Web Store API" in the same project first |
+| `CWS_CLIENT_SECRET` | Same OAuth client |
+| `CWS_REFRESH_TOKEN` | Run `npx chrome-webstore-upload-cli@4 auth --client-id ... --client-secret ...` locally and follow the browser prompt; it prints the refresh token |
+
+The step-by-step guide is at https://github.com/fregante/chrome-webstore-upload-keys.
+Tokens are only needed once; the refresh token does not expire unless revoked.
+
 ## Links
 
 - Landing page & download: https://cleancopy.tools/
