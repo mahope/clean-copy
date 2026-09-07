@@ -19,7 +19,7 @@ The popup also lets you paste-and-clean: drop in dirty HTML or messy text and ge
 
 ## Install (from source, ~30 seconds)
 
-No build step. No dependencies. Plain JavaScript. Also available for **Firefox** ([repo](https://github.com/mahope/clean-copy-firefox)), as an [Obsidian plugin](https://github.com/mahope/clean-copy-obsidian), and as a [CLI](https://github.com/mahope/clean-copy-cli) (`brew install clean-copy` or `npx github:mahope/clean-copy-cli`).
+No build step. No dependencies. Plain JavaScript. Also available for **Firefox** ([repo](https://github.com/mahope/clean-copy-firefox)), as an [Obsidian plugin](https://github.com/mahope/clean-copy-obsidian), and as a [CLI](https://github.com/mahope/clean-copy-cli) (`brew install mahope/tap/clean-copy` or `npx @mahope/clean-copy`).
 
 1. Download or clone this repository:
    ```bash
@@ -50,7 +50,7 @@ Tests cover text cleaning, HTML→Markdown conversion (headings, nested lists, c
 
 ## Links
 
-- Landing page & download: https://hermes-passiv.pages.dev/clean-copy
+- Landing page & download: https://cleancopy.tools/
 
 ## License
 
@@ -60,6 +60,10 @@ MIT
 
 - **1.5.0** — Paste-and-clean now actually in the popup: paste dirty HTML or messy text, get clean Markdown/plain text back, copied to your clipboard. (Was documented since 1.2.0 but missing from the UI.)
 - **1.4.1** — Table column alignment preserved in Markdown output; animated demo GIF.
-- **1.3.0** — Full entity decoder (named + numeric HTML entities), table conversion hardening, shared core with Firefox/CLI/Obsidian builds. Download: [v1.3.0 release](https://github.com/mahope/clean-copy/releases/tag/v1.3.0) or the [site](https://hermes-passiv.pages.dev/downloads).
+- **1.3.0** — Full entity decoder (named + numeric HTML entities), table conversion hardening, shared core with Firefox/CLI/Obsidian builds. Download: [v1.3.0 release](https://github.com/mahope/clean-copy/releases/tag/v1.3.0) or the [site](https://mahope.tools/downloads).
 - **1.2.2** — Tables → Markdown tables, entity decoding for common cases.
 - **1.2.0** — Paste-and-clean popup, options page.
+
+## Author
+
+Built by Mads Holst Jensen — developer and technical partner for small businesses, Odense, Denmark. https://mahoje.dk
