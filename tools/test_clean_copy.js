@@ -12,6 +12,9 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'background.js'), 'utf8')
 
 const sandbox = {
   console,
+  // Chrome's service worker loads license.js via importScripts.
+  importScripts: (...files) => files.forEach((f) =>
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), sandbox)),
   navigator: { clipboard: { writeText: async () => {} } },
   document: {
     createElement: () => ({ style: {}, select: () => {}, remove: () => {} }),
@@ -59,6 +62,21 @@ t('nested list', htmlToMarkdown('<ul><li>a<ul><li>b</li></ul></li></ul>').trim()
 t('nested list 3', htmlToMarkdown('<ul><li>a<ul><li>b<ul><li>c</li></ul></li></ul></li></ul>').trim(), '- a\n  - b\n    - c');
 t('ordered list', htmlToMarkdown('<ol><li>one</li><li>two</li></ol>').trim(), '1. one\n2. two');
 t('invisible word joiners stripped', cleanText('Guard\u2060ian artic\u2062le'), 'Guardian article');
+
+// Pro rules follow the 7-day offline grace at use time.
+const DAY = 24 * 60 * 60 * 1000;
+vm.runInContext(`
+  lastRevalidateAttempt = Date.now(); // no network in tests
+  proState.compiled = compileRules([{ find: 'foo', replace: 'bar' }]);
+`, sandbox);
+const setLicense = (validatedAt) => vm.runInContext(
+  `proState.license = { proLicense: '0123456789abcdef0123456789abcdef', validatedAt: ${validatedAt} };`, sandbox);
+setLicense(Date.now() - 6 * DAY);
+t('pro rules applied within grace', sandbox.withProRules({ content: 'foo' }).content, 'bar');
+setLicense(Date.now() - 8 * DAY);
+t('pro rules locked after 7 days without validation', sandbox.withProRules({ content: 'foo' }).content, 'foo');
+vm.runInContext('proState.license = {};', sandbox);
+t('pro rules locked without license', sandbox.withProRules({ content: 'foo' }).content, 'foo');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

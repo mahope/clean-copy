@@ -4,15 +4,15 @@
  * chrome.storage.local. Rules apply on every copy when Pro is active.
  */
 
-const LICENSE_API = 'https://hermes-passiv.pages.dev/api/license/validate';
-const ACTIVATE_API = 'https://hermes-passiv.pages.dev/api/license/activate';
+const L = CleanCopyLicense;
+const LICENSE_KEYS = ['proLicense', 'proExpires', 'validatedAt'];
 
 function deviceId() {
-  // Non-identifying random device token, persisted locally only.
+  // Non-identifying random device token, generated once and persisted locally.
   return new Promise((resolve) => {
     chrome.storage.local.get(['deviceId'], (data) => {
-      if (data.deviceId) return resolve(data.deviceId);
-      const d = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now());
+      if (L.isValidDeviceId(data.deviceId)) return resolve(data.deviceId);
+      const d = L.newDeviceId();
       chrome.storage.local.set({ deviceId: d }, () => resolve(d));
     });
   });
@@ -25,89 +25,103 @@ function setStatus(el, msg, cls) {
 
 /* ── License ──────────────────────────────────────────────────── */
 
-function showLicensed(expiresAt, keyStored) {
+function showLicensed(expiresAt, note) {
   document.getElementById('lic-state').textContent = '✓ active';
   document.getElementById('lic-state').style.color = '#66bb6a';
   const st = document.getElementById('license-status');
-  setStatus(st, expiresAt ? 'Pro active — valid until ' + String(expiresAt).slice(0, 10) : 'Pro active.', 'ok');
+  const base = expiresAt ? 'Pro active — valid until ' + String(expiresAt).slice(0, 10) + '.' : 'Pro active.';
+  setStatus(st, note ? base + ' ' + note : base, 'ok');
   document.getElementById('license-key').value = '';
-  document.getElementById('deactivate').hidden = !keyStored;
-  document.getElementById('rules-list').disabled = false;
+  document.getElementById('deactivate').hidden = false;
+  document.getElementById('buy-pro').hidden = true;
 }
 
-function showUnlicensed(msg) {
+function showUnlicensed(msg, keyStored) {
   document.getElementById('lic-state').textContent = 'not active';
   document.getElementById('lic-state').style.color = '';
   const st = document.getElementById('license-status');
   if (msg) setStatus(st, msg, 'error');
-  document.getElementById('deactivate').hidden = true;
+  document.getElementById('deactivate').hidden = !keyStored;
+  document.getElementById('buy-pro').hidden = false;
 }
 
-async function checkSavedLicense(key) {
-  try {
-    const res = await fetch(LICENSE_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ license_key: key, device_id: await deviceId() })
-    });
-    const j = await res.json().catch(() => ({}));
-    if (res.status === 200 && j.ok && j.valid) {
-      chrome.storage.local.set({ proLicense: key, proExpires: j.expires_at || '' });
-      showLicensed(j.expires_at, true);
-      return;
-    }
-    // Saved key no longer valid (revoked / expired / device moved).
-    chrome.storage.local.remove(['proLicense', 'proExpires']);
-    showUnlicensed(
-      j.reason === 'device_limit' ? 'Device limit reached for this license.'
-        : (j.error || 'Saved license is not valid anymore.')
-    );
-  } catch {
-    // Offline: keep the saved license usable rather than locking the user out.
-    showLicensed('', true);
+function saveValid(key, res) {
+  return new Promise((resolve) => chrome.storage.local.set(
+    { proLicense: key, proExpires: res.expiresAt || '', validatedAt: Date.now() }, resolve));
+}
+
+function clearLicense() {
+  return new Promise((resolve) => chrome.storage.local.remove(LICENSE_KEYS, resolve));
+}
+
+async function checkSavedLicense(stored) {
+  const key = stored.proLicense;
+  const res = await L.check(L.fetchPost, key, await deviceId());
+  if (res.result === 'valid') {
+    await saveValid(key, res);
+    showLicensed(res.expiresAt);
+    return true;
   }
+  if (res.result === 'invalid') {
+    // Expired, revoked, unknown or other product: drop the key locally.
+    await clearLicense();
+    showUnlicensed(res.message);
+    return false;
+  }
+  // Temporary (offline / server error): keep Pro for up to 7 days after the
+  // last successful validation, then lock it until a validation succeeds.
+  if (L.isProActive(stored, Date.now())) {
+    const until = new Date(stored.validatedAt + L.GRACE_MS).toISOString().slice(0, 10);
+    showLicensed(stored.proExpires, 'The license server is unreachable, so Pro keeps working offline until ' + until + '.');
+    return true;
+  }
+  showUnlicensed('Pro is paused: the license could not be checked for more than 7 days. ' + res.message, true);
+  return false;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('license-form');
   const keyInput = document.getElementById('license-key');
   const licStatus = document.getElementById('license-status');
+  document.getElementById('buy-pro').href = L.BUY_URL;
 
-  chrome.storage.local.get(['proLicense'], (data) => {
-    if (data.proLicense) checkSavedLicense(data.proLicense);
-    else showUnlicensed();
-    loadRules(data.proLicense ? true : false);
+  chrome.storage.local.get(LICENSE_KEYS, (data) => {
+    if (data.proLicense) {
+      loadRules(L.isProActive(data, Date.now()));
+      setStatus(licStatus, 'Checking license…');
+      checkSavedLicense(data).then((active) => loadRules(active));
+    } else {
+      showUnlicensed();
+      loadRules(false);
+    }
   });
 
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
-    const key = keyInput.value.trim().toLowerCase();
+    const key = L.normalizeKey(keyInput.value);
     if (!key) return;
+    if (!L.isValidKey(key)) {
+      setStatus(licStatus, L.errorMessage(400), 'error');
+      return;
+    }
     setStatus(licStatus, 'Checking license…');
-    try {
-      const res = await fetch(ACTIVATE_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ license_key: key, device_id: await deviceId() })
-      });
-      const j = await res.json().catch(() => ({}));
-      if (res.status === 200 && j.ok && j.activated) {
-        chrome.storage.local.set({ proLicense: key, proExpires: j.expires_at || '' });
-        showLicensed(j.expires_at, true);
-        loadRules(true);
-      } else {
-        showUnlicensed(j.error || 'Activation failed.');
-        loadRules(false);
-      }
-    } catch {
-      setStatus(licStatus, 'Network error — check your connection.', 'error');
+    const res = await L.activate(L.fetchPost, key, await deviceId());
+    if (res.result === 'valid') {
+      await saveValid(key, res);
+      showLicensed(res.expiresAt);
+      loadRules(true);
+    } else {
+      setStatus(licStatus, res.message, 'error');
     }
   });
 
-  document.getElementById('deactivate').addEventListener('click', () => {
-    // Local removal only — does not free a seat remotely.
-    chrome.storage.local.remove(['proLicense', 'proExpires']);
-    showUnlicensed('License removed from this device.');
+  document.getElementById('deactivate').addEventListener('click', async () => {
+    const data = await new Promise((resolve) => chrome.storage.local.get(['proLicense'], resolve));
+    // Free the seat on the server (best effort), then remove locally regardless.
+    const freed = data.proLicense ? await L.deactivate(L.fetchPost, data.proLicense, await deviceId()) : false;
+    await clearLicense();
+    showUnlicensed(freed ? 'License removed from this device.'
+      : 'License removed from this device. The server could not be reached, so the device slot may still count as used.');
     loadRules(false);
   });
 

@@ -2,7 +2,7 @@
 
 Copy any selected text as **clean, formatted Markdown** — right from your browser's right-click menu. No more messy pastes with broken styling, inline CSS junk, or lost formatting.
 
-![Version](https://img.shields.io/badge/version-1.5.0-blue) ![Chrome](https://img.shields.io/badge/Chrome%20%7C%20Firefox-MV3-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Version](https://img.shields.io/badge/version-1.5.3-blue) ![Chrome](https://img.shields.io/badge/Chrome%20%7C%20Firefox-MV3-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ## What it does
 
@@ -16,6 +16,16 @@ Select text on any webpage → right-click → **Clean Copy**:
 Keyboard shortcut: <kbd>Ctrl+Shift+C</kbd> (Windows/Linux) / <kbd>Cmd+Shift+C</kbd> (Mac)
 
 The popup also lets you paste-and-clean: drop in dirty HTML or messy text and get clean Markdown out.
+
+## Clean Copy Pro
+
+Pro ($19/year, 5 devices) adds custom find/replace cleanup rules that run after every copy.
+[Buy Clean Copy Pro](https://buy.stripe.com/6oU4gy76PgvgdBIdAXbMQ00); the license key arrives by email right after payment.
+Paste it under the extension's options (right-click the icon -> Options) and click **Activate**.
+
+The key is checked against `https://mahope.tools/api/license/` (key, a random per-installation device ID and the product name; nothing else).
+If the server cannot be reached, Pro keeps working for up to 7 days after the last successful check.
+**Remove license** frees the device slot so you can move the license to another machine.
 
 ## Install (from source, ~30 seconds)
 
@@ -85,6 +95,7 @@ MIT
 
 ## Changelog
 
+- **1.5.3** — Pro licenses bought via Stripe now activate: the license check uses `mahope.tools` and sends the product, "Remove license" frees the device slot, a "Buy Clean Copy Pro" link is on the options page, and offline use is capped at 7 days since the last successful check.
 - **1.5.0** — Paste-and-clean now actually in the popup: paste dirty HTML or messy text, get clean Markdown/plain text back, copied to your clipboard. (Was documented since 1.2.0 but missing from the UI.)
 - **1.4.1** — Table column alignment preserved in Markdown output; animated demo GIF.
 - **1.3.0** — Full entity decoder (named + numeric HTML entities), table conversion hardening, shared core with Firefox/CLI/Obsidian builds. Download: [v1.3.0 release](https://github.com/mahope/clean-copy/releases/tag/v1.3.0) or the [site](https://mahope.tools/downloads).

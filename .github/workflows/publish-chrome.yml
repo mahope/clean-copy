@@ -26,6 +26,8 @@ jobs:
 
       - name: Run extension logic tests
         run: node tools/test_clean_copy.js
+      - name: Run license tests
+        run: node --test tools/license.test.js
 
       - name: Version sanity check (manifest == tag)
         run: |

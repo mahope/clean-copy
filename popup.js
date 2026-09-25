@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const active = !!(state && state.active);
     proLink.innerHTML = active
       ? '✓ Pro active <span class="pro-badge">PRO</span>'
-      : 'Pro $19/yr <span class="pro-badge">Soon</span>';
+      : 'Pro $19/yr <span class="pro-badge">Buy</span>';
   });
 
   proLink.addEventListener('click', (e) => {
