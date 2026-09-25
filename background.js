@@ -6,6 +6,12 @@
  * Pro: custom cleanup rules from chrome.storage are applied after every copy.
  */
 
+// Shared license logic. Chrome's service worker loads it here; Firefox lists
+// license.js before background.js in manifest "background.scripts".
+if (typeof CleanCopyLicense === 'undefined' && typeof importScripts === 'function') {
+  importScripts('license.js');
+}
+
 const CLEAN_RULES = [
   { pattern: /[\u201C\u201D]/g, replacement: '"' },
   { pattern: /[\u2018\u2019]/g, replacement: "'" },
@@ -359,7 +365,7 @@ function htmlToMarkdown(html) {
  * applied to the final output after normal cleaning. A rule that
  * fails to compile is skipped silently — copying must never break. */
 
-let proState = { active: false, compiled: [], version: 0 };
+let proState = { active: false, compiled: [], version: 0, license: {} };
 
 function compileRules(rules) {
   if (!Array.isArray(rules)) return [];
@@ -381,16 +387,61 @@ function applyCompiled(text) {
   return cleanText(out);
 }
 
-chrome.storage.local.get(['proLicense', 'customRules'], (d) => {
-  proState.active = !!d.proLicense;
-  proState.compiled = proState.active ? compileRules(d.customRules) : [];
+/* Pro is active while a key is stored and its last successful validation is
+ * at most 7 days old (offline grace). Checked at use time, so a worker that
+ * stays alive past the grace period still locks Pro. */
+function proActiveNow() {
+  return CleanCopyLicense.isProActive(proState.license, Date.now());
+}
+
+const PRO_KEYS = ['proLicense', 'proExpires', 'validatedAt', 'deviceId', 'customRules'];
+
+function loadProState(d) {
+  proState.license = { proLicense: d.proLicense, validatedAt: d.validatedAt };
+  proState.active = proActiveNow();
+  proState.compiled = d.proLicense ? compileRules(d.customRules) : [];
+}
+
+/* Re-validate in the background about once a day so paying users keep Pro
+ * without opening the options page. Offline attempts are throttled to one
+ * per hour; the stored validatedAt is only moved on a successful check. */
+let revalidating = false;
+let lastRevalidateAttempt = 0;
+async function maybeRevalidate() {
+  const now = Date.now();
+  if (revalidating || now - lastRevalidateAttempt < 60 * 60 * 1000) return;
+  if (!CleanCopyLicense.needsRevalidation(proState.license, now)) return;
+  revalidating = true;
+  lastRevalidateAttempt = now;
+  try {
+    const d = await chrome.storage.local.get(['proLicense', 'deviceId']);
+    if (!d || !d.proLicense) return;
+    let device = d.deviceId;
+    if (!CleanCopyLicense.isValidDeviceId(device)) {
+      device = CleanCopyLicense.newDeviceId();
+      await chrome.storage.local.set({ deviceId: device });
+    }
+    const res = await CleanCopyLicense.check(CleanCopyLicense.fetchPost, d.proLicense, device);
+    if (res.result === 'valid') {
+      await chrome.storage.local.set({ proExpires: res.expiresAt || '', validatedAt: Date.now() });
+    } else if (res.result === 'invalid') {
+      await chrome.storage.local.remove(['proLicense', 'proExpires', 'validatedAt']);
+    }
+    // 'temporary': keep the cached status; proActiveNow() enforces the grace period.
+  } catch (e) {
+    // Never let license checks break copying.
+  } finally {
+    revalidating = false;
+  }
+}
+
+chrome.storage.local.get(PRO_KEYS, (d) => {
+  loadProState(d || {});
+  maybeRevalidate();
 });
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.customRules || changes.proLicense) {
-    chrome.storage.local.get(['proLicense', 'customRules'], (d) => {
-      proState.active = !!d.proLicense;
-      proState.compiled = proState.active ? compileRules(d.customRules) : [];
-    });
+  if (changes.customRules || changes.proLicense || changes.validatedAt) {
+    chrome.storage.local.get(PRO_KEYS, (d) => loadProState(d || {}));
   }
 });
 
@@ -435,6 +486,8 @@ async function processSelection(tabId, mode) {
 
 /** Apply Pro custom rules to a finished conversion result. */
 function withProRules(result) {
+  maybeRevalidate();
+  proState.active = proActiveNow();
   if (!result || result.error || !proState.active || !result.content) return result;
   return { ...result, content: applyCompiled(result.content), proApplied: true };
 }
@@ -587,6 +640,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === 'get-pro-state') {
+    proState.active = proActiveNow();
     sendResponse({ active: proState.active });
     return false;
   }
